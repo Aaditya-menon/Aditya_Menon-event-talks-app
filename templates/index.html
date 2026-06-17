@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigQuery Release Radar & Tweet Composer</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for sleek icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Dashboard Header -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-square-poll-vertical"></i>
+                </div>
+                <div class="brand-info">
+                    <h1>BigQuery Release Radar</h1>
+                    <p>Track BigQuery updates and share them on X (Twitter)</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div id="connection-status" class="status-badge connected">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connected</span>
+                </div>
+                <div class="last-fetched-container">
+                    <span class="time-label">Last updated:</span>
+                    <span id="last-fetched-time" class="time-value">Never</span>
+                </div>
+                <button id="btn-refresh" class="btn btn-primary btn-refresh" title="Refresh Release Notes">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="app-main">
+            <!-- Left Panel: Feed list and searching -->
+            <section class="feed-section">
+                <!-- Search & Filters -->
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search release notes, features, APIs...">
+                        <button id="clear-search" class="clear-search-btn" style="display: none;">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="filter-tags-container">
+                        <span class="filter-label">Filter:</span>
+                        <div class="filter-tags" id="filter-tags-list">
+                            <button class="filter-tag active" data-type="all">All</button>
+                            <button class="filter-tag" data-type="Feature"><span class="tag-dot feature"></span>Feature</button>
+                            <button class="filter-tag" data-type="Announcement"><span class="tag-dot announcement"></span>Announcement</button>
+                            <button class="filter-tag" data-type="Issue"><span class="tag-dot issue"></span>Issue</button>
+                            <button class="filter-tag" data-type="Breaking"><span class="tag-dot breaking"></span>Breaking / Change</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feed Content Area -->
+                <div class="feed-content">
+                    <!-- Loading State -->
+                    <div id="feed-loading" class="loading-state" style="display: none;">
+                        <div class="spinner-container">
+                            <div class="spinner"></div>
+                            <div class="spinner-glow"></div>
+                        </div>
+                        <p>Fetching the latest BigQuery release notes...</p>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="feed-error" class="error-state" style="display: none;">
+                        <i class="fa-solid fa-triangle-exclamation error-icon"></i>
+                        <h3>Failed to load feed</h3>
+                        <p id="error-message">Unknown error occurred while parsing the BigQuery release feed.</p>
+                        <button id="btn-retry" class="btn btn-secondary">
+                            <i class="fa-solid fa-arrow-rotate-right"></i> Try Again
+                        </button>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="feed-empty" class="empty-state" style="display: none;">
+                        <i class="fa-solid fa-folder-open empty-icon"></i>
+                        <h3>No release notes found</h3>
+                        <p>No items match your filter criteria. Try cleaning search term.</p>
+                    </div>
+
+                    <!-- Release Notes Cards Container -->
+                    <div id="feed-container" class="feed-timeline">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Tweet composer & History -->
+            <section class="side-section">
+                <!-- Tab Headers -->
+                <div class="tab-headers">
+                    <button class="tab-btn active" data-tab="composer">
+                        <i class="fa-brands fa-x-twitter"></i> Composer
+                    </button>
+                    <button class="tab-btn" data-tab="history">
+                        <i class="fa-solid fa-clock-rotate-left"></i> History
+                        <span id="history-badge" class="badge">0</span>
+                    </button>
+                </div>
+
+                <!-- Tab Content Containers -->
+                <div class="tab-contents">
+                    <!-- Composer Tab -->
+                    <div class="tab-pane active" id="tab-composer">
+                        <!-- Composer State: Empty Placeholder -->
+                        <div id="composer-placeholder" class="composer-placeholder">
+                            <div class="placeholder-art">
+                                <i class="fa-brands fa-x-twitter"></i>
+                                <div class="pulse-ring"></div>
+                            </div>
+                            <h3>Compose a Tweet</h3>
+                            <p>Select any individual release update card from the feed using the <strong><i class="fa-brands fa-x-twitter"></i> Tweet</strong> button to preview, edit, and share it on X.</p>
+                        </div>
+
+                        <!-- Composer State: Active Editor -->
+                        <div id="composer-editor" class="composer-editor" style="display: none;">
+                            <div class="panel-header-small">
+                                <h3>Tweet Preview</h3>
+                                <button id="composer-close" class="close-btn" title="Cancel composing">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+
+                            <!-- Live Mock Tweet Card -->
+                            <div class="tweet-card-mock">
+                                <div class="tweet-card-header">
+                                    <img src="https://api.dicebear.com/7.x/bottts/svg?seed=antigravity&backgroundColor=1d9bf0" alt="Avatar" class="tweet-avatar" id="tweet-avatar">
+                                    <div class="tweet-user-info">
+                                        <div class="tweet-name-row">
+                                            <span class="tweet-display-name">Cloud Architect</span>
+                                            <i class="fa-solid fa-circle-check tweet-verified-badge" title="Verified Account"></i>
+                                        </div>
+                                        <span class="tweet-handle">@gcp_tracker</span>
+                                    </div>
+                                    <i class="fa-brands fa-x-twitter tweet-card-logo"></i>
+                                </div>
+                                
+                                <div class="tweet-card-body">
+                                    <!-- Editable area in mockup -->
+                                    <textarea id="tweet-textarea" class="tweet-textarea" placeholder="What's happening in GCP BigQuery?" maxlength="400"></textarea>
+                                    
+                                    <!-- Media Attachment / Link Preview Mock -->
+                                    <div class="tweet-link-preview" id="tweet-link-preview">
+                                        <div class="link-preview-image">
+                                            <div class="logo-overlay"><i class="fa-solid fa-database"></i></div>
+                                            <div class="gcp-bar"></div>
+                                        </div>
+                                        <div class="link-preview-meta">
+                                            <span class="preview-domain">cloud.google.com</span>
+                                            <h4 class="preview-title" id="preview-title">BigQuery Release Notes</h4>
+                                            <p class="preview-desc" id="preview-desc">Read the latest official updates, announcements, and features for Google Cloud BigQuery.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="tweet-card-footer">
+                                    <div class="tweet-mock-actions">
+                                        <span><i class="fa-regular fa-comment"></i> 0</span>
+                                        <span><i class="fa-solid fa-arrows-rotate"></i> 0</span>
+                                        <span><i class="fa-regular fa-heart"></i> 0</span>
+                                        <span><i class="fa-regular fa-bookmark"></i></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Composer Controls -->
+                            <div class="composer-controls">
+                                <div class="composer-stats">
+                                    <div class="char-count-container">
+                                        <svg class="progress-ring" width="36" height="36">
+                                            <circle class="progress-ring__circle-bg" stroke="#2f3336" stroke-width="3" fill="transparent" r="14" cx="18" cy="18"/>
+                                            <circle id="char-progress-circle" class="progress-ring__circle" stroke="#1d9bf0" stroke-width="3" fill="transparent" r="14" cx="18" cy="18"/>
+                                        </svg>
+                                        <span id="char-counter" class="char-counter">280</span>
+                                    </div>
+                                    <span id="char-warning" class="char-warning-msg">Over limit by 15 characters</span>
+                                </div>
+
+                                <!-- Smart Hashtags Suggestion -->
+                                <div class="hashtag-suggestions">
+                                    <span class="suggestion-label">Quick Hashtags:</span>
+                                    <div class="hashtag-tags">
+                                        <button class="hashtag-chip" data-tag="#BigQuery">#BigQuery</button>
+                                        <button class="hashtag-chip" data-tag="#GCP">#GCP</button>
+                                        <button class="hashtag-chip" data-tag="#GoogleCloud">#GoogleCloud</button>
+                                        <button class="hashtag-chip" data-tag="#DataEngineering">#DataEngineering</button>
+                                    </div>
+                                </div>
+
+                                <div class="composer-actions">
+                                    <button id="btn-cancel-composer" class="btn btn-secondary btn-full">Cancel</button>
+                                    <button id="btn-tweet-share" class="btn btn-tweet btn-full">
+                                        <i class="fa-brands fa-x-twitter"></i>
+                                        <span>Post to X</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History Tab -->
+                    <div class="tab-pane" id="tab-history">
+                        <div id="history-empty" class="history-empty">
+                            <i class="fa-solid fa-clock-rotate-left empty-history-icon"></i>
+                            <h3>No tweets shared yet</h3>
+                            <p>Tweets you compose and post to X from this app will be saved here in your local history.</p>
+                        </div>
+                        
+                        <div id="history-list" class="history-list" style="display: none;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Toast Notification Area -->
+        <div id="toast-container" class="toast-container"></div>
+    </div>
+
+    <!-- Custom JS -->
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
